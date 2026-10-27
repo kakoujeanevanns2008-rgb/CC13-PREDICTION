@@ -33,7 +33,7 @@ MON_LIEN_INSCRIPTION = secret("MON_LIEN_INSCRIPTION", "https://1xbet.ci")
 MON_LIEN_TELEGRAM = secret("MON_LIEN_TELEGRAM", "https://t.me/VOTRE_CHAINE")
 # ===============================================================
 
-RAPIDAPI_HOST = "api-football-v1.p.rapidapi.com"
+RAPIDAPI_HOST = "v3.football.api-sports.io"
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_MODEL = "llama-3.3-70b-versatile"
 BASE_1XBET = "https://1xbet.ci"
@@ -91,8 +91,8 @@ def http_json(url, methode="GET", entetes=None, corps=None, timeout=60):
 
 # ------------------------- API-FOOTBALL -------------------------
 def api_football(chemin, params):
-    url = f"https://{RAPIDAPI_HOST}/v3/{chemin}?" + urllib.parse.urlencode(params)
-    data = http_json(url, entetes={"X-RapidAPI-Key": RAPIDAPI_KEY, "X-RapidAPI-Host": RAPIDAPI_HOST})
+    url = f"https://{RAPIDAPI_HOST}/{chemin}?" + urllib.parse.urlencode(params)
+    data = http_json(url, entetes={"x-apisports-key": RAPIDAPI_KEY})
     if data.get("errors"):
         print("[API-Football] erreurs :", data["errors"])
     return data.get("response", [])
