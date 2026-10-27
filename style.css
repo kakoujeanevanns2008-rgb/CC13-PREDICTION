@@ -81,5 +81,37 @@ body {
 .modal h3 { font-size: 1.25rem; padding-right: 30px; }
 .modal h4 { margin: 18px 0 8px; font-size: .85rem; text-transform: uppercase; color: var(--discret); letter-spacing: .5px; }
 .analyse-texte { background: var(--carte2); border-radius: 12px; padding: 14px; }
-.ligne-forme { display: flex; justify-content: space-between; align-
+.ligne-forme { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 6px 0; flex-wrap: wrap; }
+.badges { display: flex; gap: 4px; }
+.badge { width: 26px; height: 26px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: .8rem; background: #3a4560; }
+.badge.V { background: var(--accent2); }
+.badge.N { background: #64748b; }
+.badge.D { background: var(--rouge); }
+.liste { list-style: none; }
+.liste li { padding: 8px 0; border-top: 1px solid var(--bord); display: flex; justify-content: space-between; gap: 10px; font-size: .92rem; }
+.liste li:first-child { border-top: 0; }
+.probas { display: flex; gap: 8px; }
+.probas div { flex: 1; background: var(--carte2); border-radius: 10px; padding: 10px; text-align: center; font-size: .8rem; color: var(--discret); }
+.probas b { display: block; font-size: 1.1rem; color: var(--texte); }
+
+/* Telegram flottant */
+.telegram-flottant { position: fixed; right: 14px; bottom: 14px; z-index: 90; background: #229ed9; color: #fff; text-decoration: none; font-weight: 700; font-size: .9rem; padding: 14px 18px; border-radius: 99px; box-shadow: 0 6px 20px rgba(0, 0, 0, .45); max-width: calc(100vw - 28px); }
+.telegram-flottant::before { content: "✈ "; }
+
+.toast { position: fixed; left: 50%; bottom: 90px; transform: translate(-50%, 20px); background: #fff; color: #111; padding: 10px 18px; border-radius: 99px; font-weight: 700; opacity: 0; pointer-events: none; transition: .25s; z-index: 200; }
+.toast.visible { opacity: 1; transform: translate(-50%, 0); }
+
+/* Mobile : le tableau devient des cartes */
+@media (max-width: 640px) {
+  .tableau, .tableau tbody, .tableau tr, .tableau td { display: block; width: 100%; }
+  .tableau thead { display: none; }
+  .tableau { background: none; }
+  .tableau tr { background: var(--carte); border: 1px solid var(--bord); border-radius: var(--rayon); margin-bottom: 12px; padding: 8px 4px; }
+  .tableau td { border: 0; padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .tableau td::before { content: attr(data-label); color: var(--discret); font-size: .75rem; text-transform: uppercase; flex-shrink: 0; }
+  .tableau td.cellule-bouton { display: block; }
+  .tableau td.cellule-bouton::before { content: none; }
+  .tableau td.cellule-bouton .btn { width: 100%; }
+  .barre { width: 100px; }
+}
 
