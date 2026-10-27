@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""CC13 Prédiction - bot quotidien (API-Football -&gt; Groq -&gt; 1xBet -&gt; Supabase)"""
+"""CC13 Prédiction - bot quotidien (API-Football -> Groq -> 1xBet -> Supabase)"""
 
 import json
 import os
@@ -24,8 +24,6 @@ def secret(nom, defaut):
 
 
 # ====================== TES CLES ET LIENS ======================
-# Sur GitHub, ces valeurs viennent des "Secrets" (voir guide).
-# Tu peux aussi les écrire ici, mais NE LE FAIS PAS si ton dépôt est public.
 RAPIDAPI_KEY = secret("RAPIDAPI_KEY", "COLLE_ICI_TA_CLE_RAPIDAPI")
 GROQ_KEY = secret("GROQ_KEY", "COLLE_ICI_TA_CLE_GROQ")
 SUPABASE_URL = secret("SUPABASE_URL", "https://VOTRE-PROJET.supabase.co")
@@ -41,7 +39,6 @@ GROQ_MODEL = "llama-3.3-70b-versatile"
 BASE_1XBET = "https://1xbet.ci"
 FUSEAU = ZoneInfo("Africa/Abidjan")
 MAX_MATCHES = 3
-# Ordre de priorité des compétitions (IDs API-Football)
 PRIORITE = [2, 3, 848, 39, 140, 135, 78, 61, 94, 88, 12, 6]
 DOSSIER_CAPTURES = "screenshots"
 
@@ -50,7 +47,6 @@ IPHONE_UA = (
     "(KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
 )
 
-# code du pari -&gt; (regex du marché, regex de l'issue) pour 1xBet
 MARCHES = {
     "V1": (r"^(1X2|R[ée]sultat)", r"^1\d+[.,]\d+$"),
     "N": (r"^(1X2|R[ée]sultat)", r"^[XN]\d+[.,]\d+$"),
@@ -89,7 +85,7 @@ def http_json(url, methode="GET", entetes=None, corps=None, timeout=60):
             brut = r.read().decode("utf-8")
             return json.loads(brut) if brut.strip() else {}
     except urllib.error.HTTPError as e:
-        print(f"[HTTP {e.code}] {url[:80]} -&gt; {e.read().decode('utf-8', 'ignore')[:300]}")
+        print(f"[HTTP {e.code}] {url[:80]} -> {e.read().decode('utf-8', 'ignore')[:300]}")
         raise
 
 
@@ -237,7 +233,7 @@ def analyser_avec_groq(fixture, stats):
 
 # ----------------------------- 1XBET ------------------------------
 JS_LIENS = r"""
-return Array.from(document.querySelectorAll('a[href*="/line/football/"]')).map(a =&gt; a.href);
+return Array.from(document.querySelectorAll('a[href*="/line/football/"]')).map(a => a.href);
 """
 
 JS_CLIC_TEXTE = r"""
@@ -247,8 +243,8 @@ for (const el of document.querySelectorAll('button,a,div,span,li,p')) {
   const r = el.getBoundingClientRect();
   if (r.width === 0 || r.height === 0) continue;
   const t = (el.innerText || '').trim().replace(/\s+/g, ' ');
-  if (t.length === 0 || t.length &gt; 60) continue;
-  if (re.test(t) &amp;&amp; t.length &lt; bestLen) { best = el; bestLen = t.length; }
+  if (t.length === 0 || t.length > 60) continue;
+  if (re.test(t) && t.length < bestLen) { best = el; bestLen = t.length; }
 }
 if (!best) return false;
 best.scrollIntoView({block: 'center'});
@@ -259,22 +255,22 @@ return true;
 JS_CLIC_PARI = r"""
 const marche = new RegExp(arguments[0], 'i');
 const issue = new RegExp(arguments[1], 'i');
-const titres = Array.from(document.querySelectorAll('div,span,p,h2,h3,h4,li,button')).filter(e =&gt; {
+const titres = Array.from(document.querySelectorAll('div,span,p,h2,h3,h4,li,button')).filter(e => {
   const t = (e.innerText || '').trim();
-  return t.length &gt; 0 &amp;&amp; t.length &lt; 50 &amp;&amp; e.children.length &lt;= 1 &amp;&amp;
-         marche.test(t) &amp;&amp; e.getBoundingClientRect().height &gt; 0;
+  return t.length > 0 && t.length < 50 && e.children.length <= 1 &&
+         marche.test(t) && e.getBoundingClientRect().height > 0;
 });
 for (const titre of titres) {
   let boite = titre;
-  for (let i = 0; i &lt; 6 &amp;&amp; boite.parentElement; i++) {
+  for (let i = 0; i < 6 && boite.parentElement; i++) {
     boite = boite.parentElement;
-    const cands = Array.from(boite.querySelectorAll('div,span,button,li,a')).filter(e =&gt; {
+    const cands = Array.from(boite.querySelectorAll('div,span,button,li,a')).filter(e => {
       const t = (e.innerText || '').trim().replace(/\s+/g, '');
-      return t.length &gt; 0 &amp;&amp; t.length &lt; 30 &amp;&amp; /\d+[.,]\d{2}/.test(t) &amp;&amp;
-             issue.test(t) &amp;&amp; e.getBoundingClientRect().height &gt; 0;
+      return t.length > 0 && t.length < 30 && /\d+[.,]\d{2}/.test(t) &&
+             issue.test(t) && e.getBoundingClientRect().height > 0;
     });
     if (cands.length) {
-      cands.sort((a, b) =&gt; a.innerText.length - b.innerText.length);
+      cands.sort((a, b) => a.innerText.length - b.innerText.length);
       cands[0].scrollIntoView({block: 'center'});
       cands[0].click();
       return (cands[0].innerText || '').trim();
@@ -285,7 +281,7 @@ return null;
 """
 
 JS_LIRE_CODE = r"""
-const ok = t =&gt; /^[A-Z0-9]{5,8}$/.test(t) &amp;&amp; /\d/.test(t) &amp;&amp; /[A-Z]/.test(t);
+const ok = t => /^[A-Z0-9]{5,8}$/.test(t) && /\d/.test(t) && /[A-Z]/.test(t);
 for (const e of document.querySelectorAll('*')) {
   if (e.children.length !== 0 || e.getBoundingClientRect().height === 0) continue;
   const t = (e.innerText || e.textContent || '').trim();
@@ -306,7 +302,7 @@ def normaliser(texte):
 
 def mots_cles(nom):
     stop = {"fc", "cf", "sc", "ac", "as", "afc", "club", "de", "del", "la", "le", "the", "and"}
-    return [m for m in normaliser(nom).split() if len(m) &gt;= 3 and m not in stop]
+    return [m for m in normaliser(nom).split() if len(m) >= 3 and m not in stop]
 
 
 def pause(s):
@@ -472,3 +468,4 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
+
