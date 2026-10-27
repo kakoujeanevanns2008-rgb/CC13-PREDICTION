@@ -1,0 +1,46 @@
+name: Pronostics CC13
+
+on:
+  schedule:
+    - cron: "0 5 * * *"   # 5h00 UTC = 5h00 à Abidjan
+  workflow_dispatch:       # permet de lancer à la main
+
+permissions:
+  contents: read
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Installer Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Installer Selenium
+        run: pip install selenium
+
+      - name: Lancer le bot
+        run: python bot_complet.py
+        env:
+          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
+          GROQ_KEY: ${{ secrets.GROQ_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          MON_CODE_PROMO: ${{ secrets.MON_CODE_PROMO }}
+          MON_LIEN_INSCRIPTION: ${{ secrets.MON_LIEN_INSCRIPTION }}
+          MON_LIEN_TELEGRAM: ${{ secrets.MON_LIEN_TELEGRAM }}
+
+      - name: Sauvegarder les captures d'écran
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: captures
+          path: screenshots/
+          if-no-files-found: ignore
+          retention-days: 3
+
