@@ -1,10 +1,58 @@
-<section id="pronos" aria-live="polite">
-  <p class="chargement">Chargement des pronostics…</p>
-</section>
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CC13 Prédiction - Pronostics foot du jour</title>
+  <meta name="description" content="Pronostics football quotidiens, analyses et codes coupons gratuits.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="entete">
+    <div class="conteneur">
+      <h1 class="logo">CC13 <span>Prédiction</span></h1>
+      <p class="date" id="date-jour"></p>
+    </div>
+  </header>
 
-<section id="coupon-zone"></section>
+  <main class="conteneur">
+    <section class="intro">
+      <h2>Pronostics du jour</h2>
+      <p>Analyses générées automatiquement chaque matin. Gratuit.</p>
+    </section>
 
-<p class="avertissement">
-  Le pourcentage de confiance est une estimation automatique, pas une probabilité garantie.
-  Aucun pronostic n'est sûr. Réservé aux 18 ans et plus. Jouez avec modération.
-</p>
+    <section id="pronos" aria-live="polite">
+      <p class="chargement">Chargement des pronostics…</p>
+    </section>
+
+    <section id="coupon-zone"></section>
+
+    <p class="avertissement">
+      Le pourcentage de confiance est une estimation automatique, pas une probabilité garantie.
+      Aucun pronostic n'est sûr. Réservé aux 18 ans et plus. Jouez avec modération.
+    </p>
+  </main>
+
+  <footer class="pied">
+    <div class="conteneur">
+      <p>© CC13 Prédiction - Jeu responsable : fixez-vous des limites et ne jouez jamais l'argent dont vous avez besoin.</p>
+    </div>
+  </footer>
+
+  <div class="modal" id="modal" hidden>
+    <div class="modal-fond" id="modal-fond"></div>
+    <div class="modal-boite" role="dialog" aria-modal="true" aria-labelledby="modal-titre">
+      <button class="modal-fermer" id="modal-fermer" aria-label="Fermer">&times;</button>
+      <div id="modal-contenu"></div>
+    </div>
+  </div>
+
+  <a class="telegram-flottant" id="telegram-btn" href="#" target="_blank" rel="noopener">
+    <span id="telegram-texte">Rejoindre notre chaîne sur Telegram</span>
+  </a>
+
+  <div class="toast" id="toast" role="status"></div>
+
+  <script src="script.js"></script>
+</body>
+</html>
