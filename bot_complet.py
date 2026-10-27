@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""CC13 Prédiction - bot quotidien (ESPN -> Groq -> 1xBet -> Supabase)"""
+"""CC13 Prédiction - bot quotidien (API-Football -> Groq -> 1xBet -> Supabase)"""
 
 import json
 import os
@@ -24,6 +24,7 @@ def secret(nom, defaut):
 
 
 # ====================== TES CLES ET LIENS ======================
+RAPIDAPI_KEY = secret("RAPIDAPI_KEY", "COLLE_ICI_TA_CLE_APIFOOTBALL")
 GROQ_KEY = secret("GROQ_KEY", "COLLE_ICI_TA_CLE_GROQ")
 SUPABASE_URL = secret("SUPABASE_URL", "https://VOTRE-PROJET.supabase.co")
 SUPABASE_KEY = secret("SUPABASE_KEY", "COLLE_ICI_LA_CLE_SERVICE_ROLE")
@@ -32,30 +33,14 @@ MON_LIEN_INSCRIPTION = secret("MON_LIEN_INSCRIPTION", "https://1xbet.ci")
 MON_LIEN_TELEGRAM = secret("MON_LIEN_TELEGRAM", "https://t.me/VOTRE_CHAINE")
 # ===============================================================
 
-ESPN = "https://site.api.espn.com/apis"
+API_HOST = "v3.football.api-sports.io"
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_MODEL = "llama-3.3-70b-versatile"
 BASE_1XBET = "https://1xbet.ci"
 FUSEAU = ZoneInfo("Africa/Abidjan")
 MAX_MATCHES = 3
+PRIORITE = [2, 3, 848, 39, 140, 135, 78, 61, 94, 88, 12, 6]
 DOSSIER_CAPTURES = "screenshots"
-
-# Championnats par ordre de priorité (code ESPN, nom affiché)
-LIGUES = [
-    ("uefa.champions", "Ligue des champions"),
-    ("uefa.europa", "Ligue Europa"),
-    ("uefa.europa.conf", "Ligue Conférence"),
-    ("caf.champions", "Ligue des champions CAF"),
-    ("eng.1", "Premier League"),
-    ("esp.1", "LaLiga"),
-    ("ita.1", "Serie A"),
-    ("ger.1", "Bundesliga"),
-    ("fra.1", "Ligue 1"),
-    ("por.1", "Liga Portugal"),
-    ("ned.1", "Eredivisie"),
-    ("eng.2", "Championship"),
-    ("usa.1", "MLS"),
-]
 
 IPHONE_UA = (
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 "
@@ -100,83 +85,51 @@ def http_json(url, methode="GET", entetes=None, corps=None, timeout=60):
             brut = r.read().decode("utf-8")
             return json.loads(brut) if brut.strip() else {}
     except urllib.error.HTTPError as e:
-        print(f"[HTTP {e.code}] {url[:90]} -> {e.read().decode('utf-8', 'ignore')[:200]}")
+        print(f"[HTTP {e.code}] {url[:80]} -> {e.read().decode('utf-8', 'ignore')[:300]}")
         raise
 
 
-# ------------------------------ ESPN ------------------------------
-def lire_equipe(comp, cote):
-    for c in comp.get("competitors", []):
-        if c.get("homeAway") == cote:
-            t = c.get("team", {})
-            return {
-                "id": str(t.get("id", "")),
-                "nom": t.get("displayName") or t.get("name") or "?",
-                "form": c.get("form") or "",
-            }
-    return None
+# ------------------------- API-FOOTBALL -------------------------
+def api_football(chemin, params):
+    url = f"https://{API_HOST}/{chemin}?" + urllib.parse.urlencode(params)
+    data = http_json(url, entetes={"x-apisports-key": RAPIDAPI_KEY})
+    if data.get("errors"):
+        print("[API-Football] erreurs :", data["errors"])
+    return data.get("response", [])
 
 
 def choisir_matchs(date_jour):
-    date_espn = date_jour.replace("-", "")
-    trouves = []
-    for rang, (slug, nom_ligue) in enumerate(LIGUES):
-        url = f"{ESPN}/site/v2/sports/soccer/{slug}/scoreboard?dates={date_espn}"
-        try:
-            data = http_json(url, timeout=30)
-        except Exception:
-            continue
-        for ev in data.get("events", []):
-            try:
-                comp = ev["competitions"][0]
-                etat = comp.get("status", {}).get("type", {}).get("state") or \
-                    ev.get("status", {}).get("type", {}).get("state")
-                if etat != "pre":
-                    continue
-                dom = lire_equipe(comp, "home")
-                ext = lire_equipe(comp, "away")
-                if not dom or not ext:
-                    continue
-                trouves.append({
-                    "id": str(ev["id"]),
-                    "slug": slug,
-                    "ligue": nom_ligue,
-                    "date": ev.get("date") or comp.get("date"),
-                    "dom": dom,
-                    "ext": ext,
-                    "rang": rang,
-                })
-            except Exception as e:
-                print("[ESPN] match ignoré :", e)
-    print(f"{len(trouves)} matchs à venir trouvés pour {date_jour}")
-    trouves.sort(key=lambda m: (m["rang"], m["date"] or ""))
-    return trouves[:MAX_MATCHES]
+    fixtures = api_football("fixtures", {"date": date_jour, "timezone": "Africa/Abidjan"})
+    print(f"{len(fixtures)} matchs trouvés pour {date_jour}")
+    a_venir = [f for f in fixtures if f["fixture"]["status"]["short"] == "NS"]
+
+    def cle(f):
+        lid = f["league"]["id"]
+        return PRIORITE.index(lid) if lid in PRIORITE else 999
+
+    a_venir.sort(key=lambda f: (cle(f), f["fixture"]["date"]))
+    return a_venir[:MAX_MATCHES]
 
 
 _cache_classements = {}
 
 
-def classement_ligue(slug):
-    if slug in _cache_classements:
-        return _cache_classements[slug]
+def classement_ligue(ligue_id, saison):
+    cle = (ligue_id, saison)
+    if cle in _cache_classements:
+        return _cache_classements[cle]
     resultat = {}
     try:
-        rep = http_json(f"{ESPN}/v2/sports/soccer/{slug}/standings", timeout=30)
-        groupes = rep.get("children") or [rep]
-        for g in groupes:
-            for e in g.get("standings", {}).get("entries", []):
-                st = {s.get("name"): s.get("value") for s in e.get("stats", [])}
-                tid = str(e.get("team", {}).get("id", ""))
-                try:
-                    resultat[tid] = (
-                        f'{int(st["rank"])}e - {int(st["points"])} pts - {int(st["gamesPlayed"])} J '
-                        f'({int(st["wins"])}V {int(st["ties"])}N {int(st["losses"])}D)'
-                    )
-                except Exception:
-                    pass
+        rep = api_football("standings", {"league": ligue_id, "season": saison})
+        for ligne in rep[0]["league"]["standings"][0]:
+            a = ligne["all"]
+            resultat[ligne["team"]["id"]] = (
+                f'{ligne["rank"]}e - {ligne["points"]} pts - {a["played"]} J '
+                f'({a["win"]}V {a["draw"]}N {a["lose"]}D)'
+            )
     except Exception as e:
         print("[classement] indisponible :", e)
-    _cache_classements[slug] = resultat
+    _cache_classements[cle] = resultat
     return resultat
 
 
@@ -184,82 +137,73 @@ def convertir_forme(f):
     if not f:
         return "N/D"
     table = {"W": "V", "D": "N", "L": "D"}
-    lettres = [table[c] for c in f.upper() if c in table][-5:]
-    return " ".join(lettres) if lettres else "N/D"
+    return " ".join(table.get(c, c) for c in f[-5:])
 
 
-def pourcent(v):
-    try:
-        return f"{float(v):.0f}%"
-    except Exception:
-        return None
-
-
-def construire_stats(m):
-    dom, ext = m["dom"], m["ext"]
+def construire_stats(fixture):
+    fid = fixture["fixture"]["id"]
+    dom = fixture["teams"]["home"]
+    ext = fixture["teams"]["away"]
     stats = {
-        "forme_domicile": convertir_forme(dom["form"]),
-        "forme_exterieur": convertir_forme(ext["form"]),
+        "forme_domicile": "N/D",
+        "forme_exterieur": "N/D",
         "h2h": [],
         "classement_domicile": "N/D",
         "classement_exterieur": "N/D",
         "probas": {},
         "conseil_api": "",
     }
+    try:
+        rep = api_football("predictions", {"fixture": fid})
+        p = rep[0] if rep else None
+    except Exception as e:
+        print("[predictions] indisponible :", e)
+        p = None
 
-    classement = classement_ligue(m["slug"])
+    if p:
+        try:
+            stats["forme_domicile"] = convertir_forme(p["teams"]["home"]["league"]["form"])
+            stats["forme_exterieur"] = convertir_forme(p["teams"]["away"]["league"]["form"])
+        except Exception:
+            pass
+        try:
+            pc = p["predictions"]["percent"]
+            stats["probas"] = {"domicile": pc["home"], "nul": pc["draw"], "exterieur": pc["away"]}
+            stats["conseil_api"] = p["predictions"].get("advice") or ""
+        except Exception:
+            pass
+        try:
+            historique = sorted(p.get("h2h", []), key=lambda m: m["fixture"]["date"], reverse=True)[:5]
+            for m in historique:
+                stats["h2h"].append({
+                    "date": m["fixture"]["date"][:10],
+                    "match": f'{m["teams"]["home"]["name"]} - {m["teams"]["away"]["name"]}',
+                    "score": f'{m["goals"]["home"]}-{m["goals"]["away"]}',
+                })
+        except Exception:
+            pass
+
+    classement = classement_ligue(fixture["league"]["id"], fixture["league"]["season"])
     stats["classement_domicile"] = classement.get(dom["id"], "N/D")
     stats["classement_exterieur"] = classement.get(ext["id"], "N/D")
-
-    try:
-        rep = http_json(f"{ESPN}/site/v2/sports/soccer/{m['slug']}/summary?event={m['id']}", timeout=30)
-    except Exception as e:
-        print("[summary] indisponible :", e)
-        return stats
-
-    noms = {dom["id"]: dom["nom"], ext["id"]: ext["nom"]}
-    try:
-        blocs = rep.get("headToHeadGames") or []
-        if blocs:
-            for ev in (blocs[0].get("events") or [])[:5]:
-                nom_d = noms.get(str(ev.get("homeTeamId")), "?")
-                nom_e = noms.get(str(ev.get("awayTeamId")), "?")
-                stats["h2h"].append({
-                    "date": str(ev.get("gameDate", ""))[:10],
-                    "match": f"{nom_d} - {nom_e}",
-                    "score": f'{ev.get("homeTeamScore", "?")}-{ev.get("awayTeamScore", "?")}',
-                })
-    except Exception as e:
-        print("[h2h] ignoré :", e)
-
-    try:
-        pr = rep.get("predictor") or {}
-        pd = pourcent(pr["homeTeam"]["gameProjection"])
-        pe = pourcent(pr["awayTeam"]["gameProjection"])
-        if pd and pe:
-            nul = max(0, 100 - float(pr["homeTeam"]["gameProjection"]) - float(pr["awayTeam"]["gameProjection"]))
-            stats["probas"] = {"domicile": pd, "nul": f"{nul:.0f}%", "exterieur": pe}
-    except Exception:
-        pass
     return stats
 
 
 # ------------------------------ GROQ ------------------------------
-def analyser_avec_groq(m, stats):
-    dom = m["dom"]["nom"]
-    ext = m["ext"]["nom"]
+def analyser_avec_groq(fixture, stats):
+    dom = fixture["teams"]["home"]["name"]
+    ext = fixture["teams"]["away"]["name"]
     choix = ", ".join(MARCHES.keys())
     consigne = (
         "Tu es un analyste de pronostics football. Réponds UNIQUEMENT avec un objet JSON "
         'de la forme {"analyse": "...", "pronostic": "...", "confiance": 65}. '
         "Règles : 'analyse' = exactement 3 phrases en français, basées sur les statistiques fournies, "
-        "sans inventer de données (si une statistique vaut N/D, ne l'invente pas). "
-        f"'pronostic' = une seule valeur parmi : {choix}. "
+        f"sans inventer de données. 'pronostic' = une seule valeur parmi : {choix}. "
         "'confiance' = entier entre 50 et 85 (prudence : ne dépasse jamais 85)."
     )
     contenu = {
         "match": f"{dom} (domicile) vs {ext} (extérieur)",
-        "competition": m["ligue"],
+        "competition": fixture["league"]["name"],
         "statistiques": stats,
     }
     corps = {
@@ -476,18 +420,19 @@ def envoyer_supabase(ligne):
 def main():
     date_jour = datetime.now(FUSEAU).strftime("%Y-%m-%d")
     print("=== CC13 Prédiction -", date_jour, "===")
+    print("Clé API-Football : longueur", len(RAPIDAPI_KEY))
     matchs = choisir_matchs(date_jour)
     if not matchs:
         print("Aucun match exploitable aujourd'hui.")
         return 0
 
-    for i, m in enumerate(matchs, start=1):
-        dom = m["dom"]["nom"]
-        ext = m["ext"]["nom"]
-        print(f"\n--- Match {i} : {dom} - {ext} ({m['ligue']}) ---")
+    for i, f in enumerate(matchs, start=1):
+        dom = f["teams"]["home"]["name"]
+        ext = f["teams"]["away"]["name"]
+        print(f"\n--- Match {i} : {dom} - {ext} ({f['league']['name']}) ---")
         try:
-            stats = construire_stats(m)
-            analyse, code_pari, confiance = analyser_avec_groq(m, stats)
+            stats = construire_stats(f)
+            analyse, code_pari, confiance = analyser_avec_groq(f, stats)
         except Exception as e:
             print("[IA/stats] échec, match ignoré :", e)
             continue
@@ -497,13 +442,13 @@ def main():
         print("Code coupon :", coupon or "indisponible")
 
         ligne = {
-            "fixture_id": int(m["id"]),
+            "fixture_id": f["fixture"]["id"],
             "date_match": date_jour,
-            "league": m["ligue"],
+            "league": f["league"]["name"],
             "home_team": dom,
             "away_team": ext,
             "match_name": f"{dom} - {ext}",
-            "kickoff": m["date"],
+            "kickoff": f["fixture"]["date"],
             "prediction": LIBELLES[code_pari].format(dom=dom, ext=ext),
             "confiance": confiance,
             "analysis": analyse,
